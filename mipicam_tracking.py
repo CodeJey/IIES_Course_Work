@@ -214,6 +214,11 @@ class TrtThread(threading.Thread):
         self.running = False
         self.join()
 
+def inRoom_count(pin, pout):
+    inRoom = pin - pout
+    if inRoom < 0: inRoom = 0 
+    print("People in the room: " + str(inRoom))
+    #mqtt_publishCount(inRoom)
 
 def get_frame(condition):
     frame = 0
