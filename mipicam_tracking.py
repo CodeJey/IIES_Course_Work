@@ -271,11 +271,13 @@ def get_frame(condition):
                     incnt += 1
                     print("id: " + str(trk.id) + " - IN ")
                     idcnt.append(trk.id)
+                    inRoom_count(incnt, outcnt)
 
                 #OUT count
                 elif  idstp[trk.id][0][1] > H // 2 and cy < H // 2 and trk.id not in idcnt:
                     outcnt += 1
                     print("id: " + str(trk.id) + " - OUT ")
+                    inRoom_count(incnt, outcnt)
                     idcnt.append(trk.id)
 
                 cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
