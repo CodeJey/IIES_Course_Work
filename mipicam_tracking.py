@@ -309,12 +309,12 @@ def get_frame(condition):
             break
 
 def gstreamer_pipeline(
-    capture_width=1280,
-    capture_height=720,
-    display_width=1280,
-    display_height=720,
-    framerate=60,
-    flip_method=0,
+    capture_width=800,
+    capture_height=600,
+    display_width=800,
+    display_height=600,
+    framerate=30,
+    flip_method=4,
 ):
     return (
         "nvarguscamerasrc ! "
@@ -337,7 +337,7 @@ def gstreamer_pipeline(
 
 if __name__ == '__main__':
     model = 'ssd_mobilenet_v1_coco'
-    cam = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
+    cam = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
     
     if not cam.isOpened():
         raise SystemExit('ERROR: failed to open camera!')
