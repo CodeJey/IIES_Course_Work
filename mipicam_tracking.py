@@ -270,8 +270,8 @@ def get_frame(condition):
                 if  idstp[trk.id][0][1] < H // 2 and cy > H // 2 and trk.id not in idcnt:
                     incnt += 1
                     print("id: " + str(trk.id) + " - IN ")
-                    idcnt.append(trk.id)
                     inRoom_count(incnt, outcnt)
+                    idcnt.append(trk.id)
 
                 #OUT count
                 elif  idstp[trk.id][0][1] > H // 2 and cy < H // 2 and trk.id not in idcnt:
