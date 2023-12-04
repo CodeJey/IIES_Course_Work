@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 s_img, s_boxes = None, None
 INPUT_HW = (300, 300)
 MAIN_THREAD_TIMEOUT = 20.0  # 20 seconds
+initial_count = int(input("What is the current count of the people in teh room? :"))
 
 # SORT Multi object tracking
 
@@ -214,6 +215,11 @@ class TrtThread(threading.Thread):
         self.running = False
         self.join()
 
+def inRoom_count(pin, pout):
+    inRoom = (pin - pout) + initial_count
+    if inRoom < 0: inRoom = 0 
+    print("People in the room: " + str(inRoom))
+    #mqtt_publishCount(inRoom)
 
 def get_frame(condition):
     frame = 0
@@ -265,12 +271,14 @@ def get_frame(condition):
                 if  idstp[trk.id][0][1] < H // 2 and cy > H // 2 and trk.id not in idcnt:
                     incnt += 1
                     print("id: " + str(trk.id) + " - IN ")
+                    inRoom_count(incnt, outcnt)
                     idcnt.append(trk.id)
 
                 #OUT count
                 elif  idstp[trk.id][0][1] > H // 2 and cy < H // 2 and trk.id not in idcnt:
                     outcnt += 1
                     print("id: " + str(trk.id) + " - OUT ")
+                    inRoom_count(incnt, outcnt)
                     idcnt.append(trk.id)
 
                 cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
@@ -302,12 +310,12 @@ def get_frame(condition):
             break
 
 def gstreamer_pipeline(
-    capture_width=1280,
-    capture_height=720,
-    display_width=1280,
-    display_height=720,
-    framerate=60,
-    flip_method=0,
+    capture_width=800,
+    capture_height=600,
+    display_width=800,
+    display_height=600,
+    framerate=30,
+    flip_method=4,
 ):
     return (
         "nvarguscamerasrc ! "
@@ -330,7 +338,7 @@ def gstreamer_pipeline(
 
 if __name__ == '__main__':
     model = 'ssd_mobilenet_v1_coco'
-    cam = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
+    cam = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
     
     if not cam.isOpened():
         raise SystemExit('ERROR: failed to open camera!')
