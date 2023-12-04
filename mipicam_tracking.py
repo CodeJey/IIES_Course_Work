@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 s_img, s_boxes = None, None
 INPUT_HW = (300, 300)
 MAIN_THREAD_TIMEOUT = 20.0  # 20 seconds
-initial_count = int(input("What is the current count of the people in teh room? :"))
+initial_count = int(input("What is the current count of the people in teh room? : "))
 
 # SORT Multi object tracking
 
