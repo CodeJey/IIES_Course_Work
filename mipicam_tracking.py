@@ -216,7 +216,8 @@ class TrtThread(threading.Thread):
         self.join()
 
 def inRoom_count(pin, pout):
-    inRoom = (pin - pout) + initial_count
+    inRoom = pin - pout
+    inRoom = pin - pout
     if inRoom < 0: inRoom = 0 
     print("People in the room: " + str(inRoom))
     #mqtt_publishCount(inRoom)
@@ -233,7 +234,7 @@ def get_frame(condition):
     frame += 1
     idstp = collections.defaultdict(list)
     idcnt = []
-    incnt, outcnt = 0, 0
+    incnt, outcnt = initial_count, 0
     
     while True:
         with condition:
