@@ -1,9 +1,3 @@
-"""ssd.py
-
-This module implements the TrtSSD class.
-"""
-
-
 import ctypes
 
 import numpy as np
@@ -11,11 +5,9 @@ import cv2
 import tensorrt as trt
 import pycuda.driver as cuda
 
-
-def _preprocess_trt(img, shape=(300, 300)):
-    """Preprocess an image before TRT SSD inferencing."""
-    img = cv2.resize(img, shape)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+def _preprocess_trt(img, shape=(300, 300)): #Метод за предварителна обработка на изображението
+    img = cv2.resize(img, shape) # привеждане до съответната форма на изображението 300x300 пиксела
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # 
     img = img.transpose((2, 0, 1)).astype(np.float32)
     img *= (2.0/255.0)
     img -= 1.0
@@ -52,7 +44,7 @@ class TrtSSD(object):
         trt.init_libnvinfer_plugins(self.trt_logger, '')
 
     def _load_engine(self):
-        TRTbin = 'ssd/TRT_%s.bin' % self.model
+        TRTbin = 'ssd/TRT_%s.bin' % self.model # зареждане на модела(подава се и в main метода конкретно)
         with open(TRTbin, 'rb') as f, trt.Runtime(self.trt_logger) as runtime:
             return runtime.deserialize_cuda_engine(f.read())
 
@@ -103,9 +95,10 @@ class TrtSSD(object):
 
     def detect(self, img, conf_th=0.3):
         """Detect objects in the input image."""
-        img_resized = _preprocess_trt(img, self.input_shape)
-        np.copyto(self.host_inputs[0], img_resized.ravel())
+        img_resized = _preprocess_trt(img, self.input_shape) # взема се preprocess-натото изображение
+        np.copyto(self.host_inputs[0], img_resized.ravel()) # Прилага се ravel метод, за да се подаде като Input на модела
 
+        # прилагат се CUDA характерните обработки, синхронизации и преминаване през модела
         if self.cuda_ctx:
             self.cuda_ctx.push()
         cuda.memcpy_htod_async(
@@ -122,5 +115,6 @@ class TrtSSD(object):
         if self.cuda_ctx:
             self.cuda_ctx.pop()
 
+        #връщане на изход от обработката
         output = self.host_outputs[0]
         return _postprocess_trt(img, output, conf_th)

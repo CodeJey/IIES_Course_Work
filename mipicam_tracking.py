@@ -20,7 +20,7 @@ initial_count = int(input("What is the current count of the people in teh room? 
 
 # SORT Multi object tracking
 
-#iou
+#iou метод с прилагане на jit приоритизация и оптимизация(вградена в библиотеката numba)
 @jit
 def iou(bb_test, bb_gt):
     xx1 = np.maximum(bb_test[0], bb_gt[0])
@@ -33,6 +33,7 @@ def iou(bb_test, bb_gt):
     o = wh / ((bb_test[2] - bb_test[0]) * (bb_test[3] - bb_test[1])
               + (bb_gt[2] - bb_gt[0]) * (bb_gt[3] - bb_gt[1]) - wh)
     return o
+
 
 #[x1, y1, x2, y2] -> [u, v, s, r]
 def convert_bbox_to_z(bbox):
@@ -106,6 +107,7 @@ class KalmanBoxTracker(object):
         self.hit_streak += 1
         self.kf.update(convert_bbox_to_z(bbox))
 
+    # вграденият метод за прогнозиране на филтъра на Калман в тази библиотека
     def predict(self):
         """
         Advances the state vector and returns the predicted bounding box estimate.
@@ -141,19 +143,21 @@ def associate_detections_to_trackers(detections, trackers, iou_threshold=0.3):
         for t, trk in enumerate(trackers):
             iou_matrix[d, t] = iou(det, trk)
 
-    #Hungarian Algorithm
+    # Прилагана на унгарски алгоритъм зa предполагаемите съвпадения
     matched_indices = linear_assignment(-iou_matrix)
 
+    # Откриване на несъвпадащите обекти
     unmatched_detections = []
     for d, det in enumerate(detections):
         if d not in matched_indices[:, 0]:
             unmatched_detections.append(d)
+    # Откриване на несъвпадащите тракери
     unmatched_trackers = []
     for t, trk in enumerate(trackers):
         if t not in matched_indices[:, 1]:
             unmatched_trackers.append(t)
 
-    # filter out matched with low IOU
+    # отделяне на пресечните точки в обединението
     matches = []
     for m in matched_indices:
         if iou_matrix[m[0], m[1]] < iou_threshold:
@@ -189,6 +193,7 @@ class TrtThread(threading.Thread):
         self.trt_ssd = None   # to be created when run
         self.running = False
 
+    # Същинска част на разпознаване на обектите чрез TensorRT SSD Detection
     def run(self):
         global s_img, s_boxes
 
@@ -202,8 +207,11 @@ class TrtThread(threading.Thread):
             if img is None:
                 break
             img = cv2.resize(img, (300, 300))
+            # тук се извиква detect метода 
             boxes, confs, clss = self.trt_ssd.detect(img, self.conf_th)
             with self.condition:
+                #тук при разпознат обект на глобалните променливи s_img и s_boxes се дават параметрите на обработваните в момента такива 
+                # след което същите да се използват от SORT tracking алгоритъма и всичко да се оптимизира от TensorRT функционалностите
                 s_img, s_boxes = img, boxes
                 self.condition.notify()
         del self.trt_ssd
@@ -222,13 +230,15 @@ def inRoom_count(pin, pout):
     print("People in the room: " + str(inRoom))
     #mqtt_publishCount(inRoom)
 
+# методът get_frame, който обработва кадрите от камерата като изображения
 def get_frame(condition):
     frame = 0
     max_age = 15
     
     trackers = []
     
-    global s_img, s_boxes
+    global s_img, s_boxes # глобалните променливи, съдържащи информация за моментното обработвано изображение
+    # и откритите в него обекти на интерес/ограничителни кутии
     
     print("frame number ", frame)
     frame += 1
@@ -237,30 +247,36 @@ def get_frame(condition):
     incnt, outcnt = initial_count, 0
     
     while True:
-        with condition:
-            if condition.wait(timeout=MAIN_THREAD_TIMEOUT):
-                img, boxes = s_img, s_boxes
+        with condition: 
+            if condition.wait(timeout=MAIN_THREAD_TIMEOUT): # проверка на състоянието на нишката
+                img, boxes = s_img, s_boxes # даване на стойности на променливите, с които да работи метода без да се използват глобалните
             else:
                 raise SystemExit('ERROR: timeout waiting for img from child')
-        boxes = np.array(boxes)
+        boxes = np.array(boxes) # създава се numpy масив с параметрите на откритите до момента ограничителни кутии
 
-        H, W = img.shape[:2]
+        H, W = img.shape[:2] # запазване на информацията за височината и ширината на изображението от tuple 
 
-        trks = np.zeros((len(trackers), 5))
+        trks = np.zeros((len(trackers), 5)) # създаване на празен numpy масив според размера на броя тракери
         to_del = []
 
         for t, trk in enumerate(trks):
-            pos = trackers[t].predict()[0]
+            pos = trackers[t].predict()[0] # за всеки тракер се прогнозират следващите координати така че да се следи движението му,
+            # като за целта се използва филтър на Калман
+            #създава се нов tuple, в който да се събират необхванатите случаи
             trk[:] = [pos[0], pos[1], pos[2], pos[3], 0]
+            # ако на някоя позиция има стойност, която не е била разпозната(не е била число), то дадения тракер се добавя в списък за изтриване
             if np.any(np.isnan(pos)):
                 to_del.append(t)
         trks = np.ma.compress_rows(np.ma.masked_invalid(trks))
         for t in reversed(to_del):
             trackers.pop(t)
-        
+        # методът associate_detections_to_trackers всъщност е именно пресечната точка между SSD и SORT проследяването,
+        # Точно в него се инициализира използването на едни и същи кутии в които да се разпознават обекти от SSD, така и 
+        # тези кутии да се следят чрез SORT проследяване
+        # методът връща информация за съвпаденията в три отделни масива според това какво е сечението
         matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(boxes, trks)
 
-        # update matched trackers with assigned detections
+        # актуализират се съвпаденията с необхванатите тракери
         for t, trk in enumerate(trackers):
             if t not in unmatched_trks:
                 d = matched[np.where(matched[:, 1] == t)[0], 0]
@@ -338,20 +354,26 @@ def gstreamer_pipeline(
     )
 
 if __name__ == '__main__':
-    model = 'ssd_mobilenet_v1_coco'
+    model = 'ssd_mobilenet_v1_coco' # Зареждане на модела
+    # инициализиране на камерата и стартиране на стрийм, 
     cam = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
+    #който се използва функционално благодарение на метода VideoCapture от библиотеката cv2 или oще известна като opencv 
+    #използва се gstreamer пайплайн за самия стрийм
     
+    #Проверка за това дали камерата е стартирана
     if not cam.isOpened():
         raise SystemExit('ERROR: failed to open camera!')
 
-    cuda.init()  # init pycuda driver
+    cuda.init()  # инициализация на cuda драйвъра
 
-    condition = threading.Condition()
-    trt_thread = TrtThread(condition, cam, model, conf_th=0.5)
-    trt_thread.start()  # start the child thread
+    condition = threading.Condition() # проверка на състоянието на нишката(в случая TensorRT Thread или TrtThread)
+    trt_thread = TrtThread(condition, cam, model, conf_th=0.5) # стартиране на нова нишка, която трябва да вземе състоянието на текущата,
+    # инициализираната камера, модела и праг на грешка(conf_th=0.5)
+    trt_thread.start()  # Стартиране на новата нишка
 
-    get_frame(condition)
+    get_frame(condition) # Метода get_frame, който получава информация за състоянието на нишката
+    
+    
     trt_thread.stop()   # stop the child thread
-
     cam.release()
     cv2.destroyAllWindows()
